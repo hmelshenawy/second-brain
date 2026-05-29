@@ -1,0 +1,123 @@
+generator client {
+  provider = "prisma-client"
+  output   = "../generated/prisma"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model User {
+  id        String   @id @default(uuid()) @db.Uuid
+  email     String   @unique
+  password  String
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  notebooks Notebook[]
+  notes     Note[]
+  tags      Tag[]
+
+  @@map("users")
+}
+
+model Notebook {
+  id          String   @id @default(uuid()) @db.Uuid
+  title       String
+  description String?
+  userId      String   @map("user_id") @db.Uuid
+  createdAt   DateTime @default(now()) @map("created_at")
+  updatedAt   DateTime @updatedAt @map("updated_at")
+
+  user  User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+  notes Note[]
+
+  @@map("notebooks")
+}
+
+model Note {
+  id         String   @id @default(uuid()) @db.Uuid
+  title      String
+  contentMd  String?  @map("content_md")
+  isPinned   Boolean  @default(false) @map("is_pinned")
+  notebookId String?  @map("notebook_id") @db.Uuid
+  userId     String   @map("user_id") @db.Uuid
+  createdAt  DateTime @default(now()) @map("created_at")
+  updatedAt  DateTime @updatedAt @map("updated_at")
+
+  user        User          @relation(fields: [userId], references: [id], onDelete: Cascade)
+  notebook    Notebook?     @relation(fields: [notebookId], references: [id], onDelete: Cascade)
+  tags        NoteTag[]
+  sourceLinks NoteLink[]    @relation("SourceNotes")
+  targetLinks NoteLink[]    @relation("TargetNotes")
+  attachments Attachment[]
+  aiSummary   AiSummary?
+
+  @@map("notes")
+}
+
+model Tag {
+  id        String   @id @default(uuid()) @db.Uuid
+  name      String
+  color     String   @default("#6B7280")
+  userId    String   @map("user_id") @db.Uuid
+  createdAt DateTime @default(now()) @map("created_at")
+
+  user  User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  notes NoteTag[]
+
+  @@unique([userId, name])
+  @@map("tags")
+}
+
+model NoteTag {
+  noteId String @map("note_id") @db.Uuid
+  tagId  String @map("tag_id") @db.Uuid
+
+  note Note @relation(fields: [noteId], references: [id], onDelete: Cascade)
+  tag  Tag  @relation(fields: [tagId], references: [id], onDelete: Cascade)
+
+  @@id([noteId, tagId])
+  @@map("note_tags")
+}
+
+model NoteLink {
+  id           String   @id @default(uuid()) @db.Uuid
+  sourceNoteId String   @map("source_note_id") @db.Uuid
+  targetNoteId String   @map("target_note_id") @db.Uuid
+  linkText     String?  @map("link_text")
+  createdAt    DateTime @default(now()) @map("created_at")
+
+  sourceNote Note @relation("SourceNotes", fields: [sourceNoteId], references: [id], onDelete: Cascade)
+  targetNote Note @relation("TargetNotes", fields: [targetNoteId], references: [id], onDelete: Cascade)
+
+  @@unique([sourceNoteId, targetNoteId])
+  @@map("note_links")
+}
+
+model Attachment {
+  id        String   @id @default(uuid()) @db.Uuid
+  noteId    String   @map("note_id") @db.Uuid
+  filename   String
+  mimeType  String   @map("mime_type")
+  sizeBytes Int      @map("size_bytes")
+  r2Key     String   @map("r2_key")
+  createdAt DateTime @default(now()) @map("created_at")
+
+  note Note @relation(fields: [noteId], references: [id], onDelete: Cascade)
+
+  @@map("attachments")
+}
+
+model AiSummary {
+  id          String   @id @default(uuid()) @db.Uuid
+  noteId      String   @unique @map("note_id") @db.Uuid
+  summary     String
+  modelUsed   String   @map("model_used")
+  generatedAt DateTime @default(now()) @map("generated_at")
+
+  note Note @relation(fields: [noteId], references: [id], onDelete: Cascade)
+
+  @@map("ai_summaries")
+}
